@@ -9,17 +9,14 @@ import java.util.Date;
 
 
 public class Printer {
-	private static final int PAGE_WIDTH = 30;
+	private static final int PAGE_WIDTH = 200;
 	private static final int BYTE_ARR_SIZE = 2000;
 	private static final int EXTRA_READ = 2;
 	private static final String TAB_SPACE = "    ";
 	
 	public static void main(String[] args) throws IOException{
 		
-		//testCharBuf();
 		test();
-		//char[] arr = {'a','b','c'};
-		//System.out.println(Arrays.copyOfRange(arr,1,2));
 		
 	}
 	
@@ -75,31 +72,90 @@ public class Printer {
 		
 		String allBuff = String.valueOf(cbuf);
 		allBuff = allBuff.replaceAll("\t", TAB_SPACE);
-		char[] scanned = tabChanger(cbuf);
+		allBuff = allBuff.replaceAll("\r\n", "\n");
 		
-		processLineBulk(scanned);
+		processLineBulk(allBuff.toCharArray());
 	}
 	
 	public static void processLineBulk(char[] cbuf){
-		int cursor = 0, offset = 0;
-		for(int i=0; i < cbuf.length; i++){
-			offset = lineCutter(Arrays.copyOfRange(cbuf, cursor, cursor + PAGE_WIDTH + EXTRA_READ));
+		int cursor = 0, cursorEnd = 0, offset = 0;
+		while(cursor + PAGE_WIDTH + EXTRA_READ < cbuf.length){
+			char[] targetRange = Arrays.copyOfRange(cbuf, cursor, cursor + PAGE_WIDTH);
+			
+			//starting with spaces
+			int leadingSpaceCount = countLeadingSpaces(targetRange);
+			cursor += leadingSpaceCount;
+			
+			cursorEnd = cursor + PAGE_WIDTH;
+			targetRange = Arrays.copyOfRange(cbuf, cursor, cursorEnd);
+			
+			//newlines
+			int newLinePos = findNewLinePos(targetRange);
+			if(newLinePos != -1){
+				targetRange = Arrays.copyOfRange(cbuf, cursor, cursor + newLinePos);
+				cursor += newLinePos;
+				lineCutter(targetRange, false);
+				continue;
+			}
+			
+			boolean isWordSplit = checkWordSplit2(cbuf[cursorEnd-1], cbuf[cursorEnd], cbuf[cursorEnd+1]);
+			offset = lineCutter(targetRange, isWordSplit);
 			cursor += PAGE_WIDTH - offset + 1;
 		}
+	}
+	
+	private static int findNewLinePos(char[] cbuf){
+		int pos = -1;
+		
+		String line = String.valueOf(cbuf);
+		pos = line.indexOf("\n");
+		
+		return pos;
+	}
+	
+	private static int countLeadingSpaces(char[] cbuf){
+		int ctr = 0;
+		
+		int maxValidCheck = cbuf.length > PAGE_WIDTH ? PAGE_WIDTH : cbuf.length;
+		for(int idx = 0; idx < maxValidCheck; idx++){
+			if(cbuf[idx] == ' ' || cbuf[idx] == '\n'){
+				ctr++;
+			}
+			else{
+				break;
+			}
+		}
+		
+		return ctr;
+	}
+	
+	public static boolean checkWordSplit2(char left, char middle, char right){
+		boolean isSplit = false;
+		if(isAlpha(middle)){
+			if(isAlpha(left)){
+				isSplit = true;//pp
+			}
+			else if(left == ' ' && isAlpha(right)){//_p_
+				isSplit = true;
+			}
+		}
+		
+		return isSplit;
 	}
 	
 	public static boolean checkWordSplit(char[] cbuf){
 		boolean isSplit = false;
 		
-		char lastChar = cbuf[PAGE_WIDTH];
-		char prevChar = cbuf[PAGE_WIDTH - 1];
-		char nextChar = cbuf[PAGE_WIDTH + 1];
+		int maxLen = cbuf.length;
+		char middle = cbuf[maxLen - 2];
+		char left = cbuf[maxLen - 3];
+		char right = cbuf[maxLen - 1];
 		
-		if(isAlpha(lastChar)){
-			if(isAlpha(prevChar)){
+		if(isAlpha(middle)){
+			if(isAlpha(left)){
 				isSplit = true;//pp
 			}
-			else if(prevChar == ' ' && isAlpha(nextChar)){//_p_
+			else if(left == ' ' && isAlpha(right)){//_p_
 				isSplit = true;
 			}
 		}
@@ -122,20 +178,20 @@ public class Printer {
 	}
 	
 	//takes in cbuf[101]
-	public static int lineCutter(char[] cbuf){
+	public static int lineCutter(char[] cbuf, boolean isWordSplit){
 		int offset = 0;
-		boolean isWordSplit = checkWordSplit(cbuf);
 		
-		cbuf = Arrays.copyOf(cbuf, cbuf.length - EXTRA_READ);
+		
 		if(isWordSplit){
 			int cutPos = findEndPos(cbuf);
 			String line = String.valueOf(cbuf).substring(0,cutPos);
-			System.out.println(line);// no need to append \n since I'm using sysout
+			System.out.println(line.trim());// no need to append \n since I'm using sysout
 			
 			offset = String.valueOf(cbuf).length() - cutPos;
 			
 		}else{
-			System.out.println(cbuf);
+			String line = String.valueOf(cbuf);
+			System.out.println(line.trim());
 		}
 		
 		return offset;
