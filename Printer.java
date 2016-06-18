@@ -1,109 +1,145 @@
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.StringWriter;
-import java.nio.CharBuffer;
 import java.util.Arrays;
-import java.util.Date;
+import java.util.InputMismatchException;
+import java.util.Scanner;
 
 
 public class Printer {
-	private static final int PAGE_WIDTH = 200;
-	private static final int BYTE_ARR_SIZE = 2000;
+	private static int PAGE_WIDTH = 100;
+	private static int BYTE_ARR_SIZE = 2000;
 	private static final int EXTRA_READ = 2;
 	private static final String TAB_SPACE = "    ";
 	
-	public static void main(String[] args) throws IOException{
-		
-		test();
-		
-	}
+	private static char[] remainChar = new char[0];
 	
-	public static void testCharBuf() throws IOException{
-		FileReader fis = new FileReader(new File("test.txt"));
-		CharBuffer cb = CharBuffer.allocate(BYTE_ARR_SIZE);
-		int numCharRead = fis.read(cb);
+	public static void main(String[] args){
 		
-		Date start = new Date();
-		StringWriter sw = new StringWriter(BYTE_ARR_SIZE);
-		while(numCharRead >= BYTE_ARR_SIZE){
-			
-			sw.write(cb.array(), 0, numCharRead);
-			
-			System.out.println(sw.toString());
-			System.out.println(checkWordSplit(cb.array()));
-			cb.clear(); sw.getBuffer().setLength(0);
-			numCharRead = fis.read(cb);
+		Scanner sc = new Scanner(System.in);
+		try{
+			System.out.println("Enter page width (in bytes: e.g. 50/100): ");
+			PAGE_WIDTH = sc.nextInt();
+			sc.nextLine();
+			System.out.println("Enter file name:");
+			String fileName = sc.nextLine();
+			sc.close();
+			test(fileName);
+		}catch(InputMismatchException e){
+			System.out.println("Please enter a valid input");
 		}
-		Date end = new Date();
-		long timeDiff = end.getTime() - start.getTime();
-		System.out.println("****");
-		System.out.println("TIME: " + timeDiff);
-		System.out.println(numCharRead);
-		fis.close();
 		
 	}
+
+	public static void test(String fileName){
+		char[] cbuf = null;
+		try{
+			FileReader fis = new FileReader(new File(fileName));
+			int numCharRead = 0;
+			
 	
-	public static void test() throws IOException{
-		char[] cbuf = new char[BYTE_ARR_SIZE];
-		FileReader fis = new FileReader(new File("test2.txt"));
-		int numCharRead = fis.read(cbuf);
-		
-		Date start = new Date();
-		StringWriter sw = new StringWriter(BYTE_ARR_SIZE);
-		while(numCharRead >= BYTE_ARR_SIZE || numCharRead > 0){
-			    
+			do{
+				cbuf = new char[BYTE_ARR_SIZE];
+				numCharRead = fis.read(cbuf,0,BYTE_ARR_SIZE);
 				
-			sw.write(cbuf, 0, numCharRead);
-			processLinkBulkTabs(cbuf);
-			sw.getBuffer().setLength(0);
-			numCharRead = fis.read(cbuf, -1, 100);
+				boolean finalRead = false; 
+				if(numCharRead < BYTE_ARR_SIZE){
+					finalRead = true;
+					cbuf = Arrays.copyOfRange(cbuf, 0, numCharRead);
+				}
+				if(remainChar.length != 0){
+					cbuf = prefixArr(cbuf);
+				}
+				
+				cbuf = processSpaces(cbuf);
+				int errState = processLineBulk(cbuf, finalRead);
+				if(errState == -1){
+					System.out.println("Ending Program");
+					break;
+				}
+			}while(numCharRead == BYTE_ARR_SIZE);
+			
+			fis.close();
+		}catch (Exception e) {
+			System.out.println("File not found");
 		}
-		Date end = new Date();
-		long timeDiff = end.getTime() - start.getTime();
-		System.out.println("****");
-		System.out.println("TIME: " + timeDiff);
-		System.out.println(numCharRead);
-		fis.close();
 	}
 	
-	public static void processLinkBulkTabs(char[] cbuf){
+	private static char[] prefixArr(char[] cbuf) {
+		int cbufLen = cbuf.length;
+		int remArrLen = remainChar.length;
 		
+		char[] concatArr = new char[cbufLen + remArrLen];
+		System.arraycopy(remainChar, 0, concatArr, 0, remArrLen);
+        System.arraycopy(cbuf, 0, concatArr, remArrLen, cbufLen);
+        
+        return concatArr;
+	}
+
+	public static char[] processSpaces(char[] cbuf){
 		String allBuff = String.valueOf(cbuf);
 		allBuff = allBuff.replaceAll("\t", TAB_SPACE);
 		allBuff = allBuff.replaceAll("\r\n", "\n");
 		
-		processLineBulk(allBuff.toCharArray());
+		return allBuff.toCharArray();
 	}
 	
-	public static void processLineBulk(char[] cbuf){
+	public static int processLineBulk(char[] cbuf, boolean finalRead){
 		int cursor = 0, cursorEnd = 0, offset = 0;
+		int errState = 0;
 		while(cursor + PAGE_WIDTH + EXTRA_READ < cbuf.length){
-			char[] targetRange = Arrays.copyOfRange(cbuf, cursor, cursor + PAGE_WIDTH);
+			if(errState == -1){
+				return errState;
+			}
 			
-			//starting with spaces
+			cursorEnd = cursor + PAGE_WIDTH;
+			char[] targetRange = Arrays.copyOfRange(cbuf, cursor, cursorEnd);
+			
 			int leadingSpaceCount = countLeadingSpaces(targetRange);
 			cursor += leadingSpaceCount;
-			
 			cursorEnd = cursor + PAGE_WIDTH;
 			targetRange = Arrays.copyOfRange(cbuf, cursor, cursorEnd);
 			
-			//newlines
 			int newLinePos = findNewLinePos(targetRange);
 			if(newLinePos != -1){
 				targetRange = Arrays.copyOfRange(cbuf, cursor, cursor + newLinePos);
 				cursor += newLinePos;
-				lineCutter(targetRange, false);
+				errState = lineCutter(targetRange, false);
 				continue;
 			}
 			
 			boolean isWordSplit = checkWordSplit2(cbuf[cursorEnd-1], cbuf[cursorEnd], cbuf[cursorEnd+1]);
 			offset = lineCutter(targetRange, isWordSplit);
 			cursor += PAGE_WIDTH - offset + 1;
+			
+			errState = offset;
 		}
+		
+		if(finalRead && cursor < cbuf.length){
+			while(cursor < cbuf.length){
+				char[] targetRange = Arrays.copyOfRange(cbuf, cursor, cbuf.length);
+				int leadingSpaceCount = countLeadingSpaces(targetRange);
+				cursor += leadingSpaceCount;
+				
+				targetRange = Arrays.copyOfRange(cbuf, cursor, cbuf.length);
+				int newLinePos = findNewLinePos(targetRange);
+				if(newLinePos != -1){
+					targetRange = Arrays.copyOfRange(cbuf, cursor, cursor + newLinePos);
+					cursor += newLinePos;
+					errState = lineCutter(targetRange, false);
+					continue;
+				}
+				
+				lineCutter(targetRange, false);
+				cursor = cbuf.length;
+			}
+		}
+		else if(cursor < cbuf.length){
+			remainChar = Arrays.copyOfRange(cbuf, cursor, cbuf.length);
+		}
+		return errState;
 	}
-	
+
 	private static int findNewLinePos(char[] cbuf){
 		int pos = -1;
 		
@@ -171,19 +207,17 @@ public class Printer {
 		return false;
 	}
 	
-	private static char[] tabChanger(char[] cbuf){
-		String line = String.valueOf(cbuf);
-		line = line.replaceAll("\t", TAB_SPACE);
-		return line.toCharArray();
-	}
-	
-	//takes in cbuf[101]
 	public static int lineCutter(char[] cbuf, boolean isWordSplit){
 		int offset = 0;
 		
 		
 		if(isWordSplit){
 			int cutPos = findEndPos(cbuf);
+			
+			if(cutPos == -1){
+				return -1;
+			}
+			
 			String line = String.valueOf(cbuf).substring(0,cutPos);
 			System.out.println(line.trim());// no need to append \n since I'm using sysout
 			
@@ -200,10 +234,15 @@ public class Printer {
 	public  static int findEndPos(char[] cbuf){
 		int pos = 0;
 		
-		for(int idx = cbuf.length - 1; idx < cbuf.length; idx--){
-			if(cbuf[idx] == ' ' || cbuf[idx] == '\t' || cbuf[idx] == '\n'){
-				return idx;
+		try{
+			for(int idx = cbuf.length - 1; idx < cbuf.length; idx--){
+				if(cbuf[idx] == ' ' || cbuf[idx] == '\t' || cbuf[idx] == '\n'){
+					return idx;
+				}
 			}
+		}catch(ArrayIndexOutOfBoundsException e){
+			System.out.println("Assumption: Single Word cannot be greater than width of book");
+			pos = -1;
 		}
 		
 		return pos;
