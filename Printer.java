@@ -9,9 +9,10 @@ import java.util.Date;
 
 
 public class Printer {
-	private static final int PAGE_WIDTH = 100;
+	private static final int PAGE_WIDTH = 30;
 	private static final int BYTE_ARR_SIZE = 2000;
 	private static final int EXTRA_READ = 2;
+	private static final String TAB_SPACE = "    ";
 	
 	public static void main(String[] args) throws IOException{
 		
@@ -49,15 +50,16 @@ public class Printer {
 	
 	public static void test() throws IOException{
 		char[] cbuf = new char[BYTE_ARR_SIZE];
-		FileReader fis = new FileReader(new File("test.txt"));
+		FileReader fis = new FileReader(new File("test2.txt"));
 		int numCharRead = fis.read(cbuf);
 		
 		Date start = new Date();
 		StringWriter sw = new StringWriter(BYTE_ARR_SIZE);
 		while(numCharRead >= BYTE_ARR_SIZE || numCharRead > 0){
-			
+			    
+				
 			sw.write(cbuf, 0, numCharRead);
-			processLineBulk(cbuf);
+			processLinkBulkTabs(cbuf);
 			sw.getBuffer().setLength(0);
 			numCharRead = fis.read(cbuf, -1, 100);
 		}
@@ -67,6 +69,15 @@ public class Printer {
 		System.out.println("TIME: " + timeDiff);
 		System.out.println(numCharRead);
 		fis.close();
+	}
+	
+	public static void processLinkBulkTabs(char[] cbuf){
+		
+		String allBuff = String.valueOf(cbuf);
+		allBuff = allBuff.replaceAll("\t", TAB_SPACE);
+		char[] scanned = tabChanger(cbuf);
+		
+		processLineBulk(scanned);
 	}
 	
 	public static void processLineBulk(char[] cbuf){
@@ -93,7 +104,6 @@ public class Printer {
 			}
 		}
 		
-		
 		return isSplit;
 	}
 	
@@ -102,8 +112,13 @@ public class Printer {
 		if(x >= 'A' && x <= 'Z'){
 			return true;
 		}
-		
 		return false;
+	}
+	
+	private static char[] tabChanger(char[] cbuf){
+		String line = String.valueOf(cbuf);
+		line = line.replaceAll("\t", TAB_SPACE);
+		return line.toCharArray();
 	}
 	
 	//takes in cbuf[101]
