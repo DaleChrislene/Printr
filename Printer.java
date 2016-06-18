@@ -1,6 +1,5 @@
 import java.io.File;
 import java.io.FileReader;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.InputMismatchException;
 import java.util.Scanner;
@@ -24,14 +23,20 @@ public class Printer {
 			System.out.println("Enter file name:");
 			String fileName = sc.nextLine();
 			sc.close();
-			test(fileName);
+			printBook(fileName);
 		}catch(InputMismatchException e){
 			System.out.println("Please enter a valid input");
 		}
 		
 	}
 
-	public static void test(String fileName){
+	/**
+	 * prints the input from fileName
+	 * as a book
+	 * 
+	 * @param fileName
+	 */
+	private static void printBook(String fileName){
 		char[] cbuf = null;
 		try{
 			FileReader fis = new FileReader(new File(fileName));
@@ -61,10 +66,18 @@ public class Printer {
 			
 			fis.close();
 		}catch (Exception e) {
-			System.out.println("File not found");
+			e.printStackTrace();
+			System.out.println("Program Error!");
 		}
 	}
 	
+	/**
+	 * prefixes the remaining bytes unprinted from previous
+	 * cycle
+	 * 
+	 * @param cbuf
+	 * @return
+	 */
 	private static char[] prefixArr(char[] cbuf) {
 		int cbufLen = cbuf.length;
 		int remArrLen = remainChar.length;
@@ -75,8 +88,15 @@ public class Printer {
         
         return concatArr;
 	}
-
-	public static char[] processSpaces(char[] cbuf){
+	
+	/**
+	 * Converts Tabs and carriage returns to spaces
+	 * and "\n" respectively
+	 * 
+	 * @param cbuf
+	 * @return
+	 */
+	private static char[] processSpaces(char[] cbuf){
 		String allBuff = String.valueOf(cbuf);
 		allBuff = allBuff.replaceAll("\t", TAB_SPACE);
 		allBuff = allBuff.replaceAll("\r\n", "\n");
@@ -84,7 +104,15 @@ public class Printer {
 		return allBuff.toCharArray();
 	}
 	
-	public static int processLineBulk(char[] cbuf, boolean finalRead){
+	/**
+	 * Processes and prints the bytes read from the
+	 * input stream
+	 * 
+	 * @param cbuf
+	 * @param finalRead
+	 * @return
+	 */
+	private static int processLineBulk(char[] cbuf, boolean finalRead){
 		int cursor = 0, cursorEnd = 0, offset = 0;
 		int errState = 0;
 		while(cursor + PAGE_WIDTH + EXTRA_READ < cbuf.length){
@@ -97,7 +125,7 @@ public class Printer {
 			
 			int leadingSpaceCount = countLeadingSpaces(targetRange);
 			cursor += leadingSpaceCount;
-			cursorEnd = cursor + PAGE_WIDTH;
+			cursorEnd = cursor + PAGE_WIDTH > cbuf.length ? cbuf.length : cursor + PAGE_WIDTH;
 			targetRange = Arrays.copyOfRange(cbuf, cursor, cursorEnd);
 			
 			int newLinePos = findNewLinePos(targetRange);
@@ -108,7 +136,11 @@ public class Printer {
 				continue;
 			}
 			
-			boolean isWordSplit = checkWordSplit2(cbuf[cursorEnd-1], cbuf[cursorEnd], cbuf[cursorEnd+1]);
+			boolean isWordSplit = false;
+			if(cursorEnd + 1 < cbuf.length){
+				isWordSplit = checkWordSplit(cbuf[cursorEnd-1], cbuf[cursorEnd], cbuf[cursorEnd+1]);
+			}
+			
 			offset = lineCutter(targetRange, isWordSplit);
 			cursor += PAGE_WIDTH - offset + 1;
 			
@@ -149,6 +181,11 @@ public class Printer {
 		return pos;
 	}
 	
+	/**
+	 * counts and returns the number of leading spaces " " or "\n"
+	 * @param cbuf
+	 * @return
+	 */
 	private static int countLeadingSpaces(char[] cbuf){
 		int ctr = 0;
 		
@@ -165,7 +202,15 @@ public class Printer {
 		return ctr;
 	}
 	
-	public static boolean checkWordSplit2(char left, char middle, char right){
+	/**
+	 * checks if word is split
+	 * 
+	 * @param left
+	 * @param middle
+	 * @param right
+	 * @return
+	 */
+	private static boolean checkWordSplit(char left, char middle, char right){
 		boolean isSplit = false;
 		if(isAlpha(middle)){
 			if(isAlpha(left)){
@@ -179,26 +224,13 @@ public class Printer {
 		return isSplit;
 	}
 	
-	public static boolean checkWordSplit(char[] cbuf){
-		boolean isSplit = false;
-		
-		int maxLen = cbuf.length;
-		char middle = cbuf[maxLen - 2];
-		char left = cbuf[maxLen - 3];
-		char right = cbuf[maxLen - 1];
-		
-		if(isAlpha(middle)){
-			if(isAlpha(left)){
-				isSplit = true;//pp
-			}
-			else if(left == ' ' && isAlpha(right)){//_p_
-				isSplit = true;
-			}
-		}
-		
-		return isSplit;
-	}
-	
+	/**
+	 * Checks if char is an aplhabet
+	 * 
+	 * 
+	 * @param x
+	 * @return
+	 */
 	private static boolean isAlpha(char x){
 		x = String.valueOf(x).toUpperCase().charAt(0);
 		if(x >= 'A' && x <= 'Z'){
@@ -207,9 +239,15 @@ public class Printer {
 		return false;
 	}
 	
-	public static int lineCutter(char[] cbuf, boolean isWordSplit){
+	/**
+	 * Splits sentences into max width
+	 * 
+	 * @param cbuf
+	 * @param isWordSplit
+	 * @return
+	 */
+	private static int lineCutter(char[] cbuf, boolean isWordSplit){
 		int offset = 0;
-		
 		
 		if(isWordSplit){
 			int cutPos = findEndPos(cbuf);
@@ -231,7 +269,13 @@ public class Printer {
 		return offset;
 	}
 	
-	public  static int findEndPos(char[] cbuf){
+	/**
+	 * Find position of the split word
+	 * 
+	 * @param cbuf
+	 * @return
+	 */
+	private  static int findEndPos(char[] cbuf){
 		int pos = 0;
 		
 		try{
